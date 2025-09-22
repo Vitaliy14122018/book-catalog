@@ -1,0 +1,57 @@
+public function updateBook(Request $request, $bookId)
+{
+    // Получаем параметры фильтров и сортировки
+    $searchTitle = $request->input('search_title');
+    $searchAuthor = $request->input('search_author');
+    $sort = $request->input('sort', 'asc'); // Если сортировка не передана, по умолчанию 'asc'
+
+    // Найдем книгу по ID
+    $book = Book::findOrFail($bookId);
+
+    // Обновляем данные книги
+    $book->title = $request->input('title');
+    $book->description = $request->input('description');
+    $book->published_at = $request->input('published_at');
+    // Обновление других полей...
+
+    // Сохраняем изменения
+    $book->save();
+
+    // Применяем фильтры и сортировку к запросу для получения списка книг (если нужно)
+    $query = Book::query();
+
+    if ($searchTitle) {
+        $query->where('title', 'like', '%' . $searchTitle . '%');
+    }
+
+    if ($searchAuthor) {
+        $query->whereHas('authors', function ($q) use ($searchAuthor) {
+            $q->where('surname', 'like', '%' . $searchAuthor . '%');
+        });
+    }
+
+    // Сортируем по названию
+    if ($sort === 'desc') {
+        $query->orderBy('title', 'desc');
+    } else {
+        $query->orderBy('title', 'asc');
+    }
+
+    // Пагинируем
+    $books = $query->paginate(10);
+
+    // Отправляем данные назад на фронт
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Книга успешно обновлена!',
+        'book' => $book,
+        'books' => $books, // если нужно вернуть обновленный список
+    ]);
+}
+
+
+
+// В контроллере при отправке пагинации
+$paginationHtml = view('books.partials.pagination', [
+    'books' => $books->appends(request()->except(['page', 'bookId']))  // Исключаем 'bookId'
+])->render();
